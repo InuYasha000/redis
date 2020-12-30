@@ -9,74 +9,87 @@ import java.util.Random;
 import java.util.UUID;
 
 /**
- * @Date:2020/11/12 16:57
- * @Author: Cheng
- * @Description:session1登录
- * hset   key  field  value
- * key代表一个hash  field-value才是key-value对
+ * @Auther: cheng
+ * @Date: 2020/12/30 20:29
+ * @Description:登录会话
  */
 public class SessionDemo {
 
-    SessionDemo() {
-        jedis = new Jedis("127.0.0.1");
+    private Jedis jedis = new Jedis("127.0.0.1");
+
+    /**
+     * 检查session是否有效
+     */
+    public boolean isSessionValid(String token) throws Exception {
+        if (token == null && "".equals(token)) {
+            return false;
+        }
+
+        //这里拿到的session就是一个json字符串，放一个用户 userId
+        String session = jedis.hget("sessions", "session::" + token);
+        if (session == null || "".equals(session)) {
+            return false;
+        }
+
+        //有session还需要检查是否在有效期内
+        String expireTime = jedis.hget("sessions::expire_time", "session::" + token);
+        if (expireTime == null && "".equals(expireTime)) {
+            return false;
+        }
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Date expireTimeDate = sdf.parse(expireTime);
+        Date now = new Date();
+
+        if (now.after(expireTimeDate)) {
+            return false;
+        }
+
+        //token不为空，获取到的session不为空，session没有过期
+        //此时表示session在有效期
+        return true;
     }
 
-    private static Jedis jedis;
+    /**
+     * 用户登录成功后初始化session
+     */
+    public void initSession(String userId, String token) throws Exception {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(new Date());
+        //设置24小时过期
+        calendar.add(Calendar.HOUR, 24);
+        String expireTimeDate = sdf.format(calendar.getTime());
+
+        jedis.hset("sessions", "session::" + token, userId);
+        jedis.hset("sessions::expire_time", "session::" + token, expireTimeDate);
+    }
+
+    /**
+     * 模拟的登录方法
+     */
+    public String login(String userName, String pwd) throws Exception{
+        System.out.println("基于用户名和密码登录：" + userName + "," + pwd);
+        Random random = new Random();
+        long userId = random.nextInt() * 100;
+        //登录成功后生成一块令牌
+        String token = UUID.randomUUID().toString().replace("-", "");
+        //基于令牌和用户id初始化session
+        initSession(String.valueOf(userId), token);
+        return token;
+    }
 
     public static void main(String[] args) throws Exception {
         SessionDemo demo = new SessionDemo();
 
-        boolean isValid = demo.isValidToken(null);
-        System.out.println(isValid);
+        //第一次访问系统，token都是空的
+        boolean isSessionValid = demo.isSessionValid(null);
+        System.out.println("第一次访问系统的session校验结果：" + isSessionValid);
 
-        String token = demo.login("cheng", "123456");
-        System.out.println(token);
+        //登录,获取到token
+        String token = demo.login("张三","123456");
 
-        isValid = demo.isValidToken(token);
-        System.out.println(isValid);
-    }
-
-    private String login(String username, String password) {
-        Random random = new Random();
-        long userId = random.nextInt() * 100;
-
-        String token = UUID.randomUUID().toString().replace("-","");
-        initSession(token,userId);
-        return token;
-    }
-
-    private void initSession(String token, long userId) {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(new Date());
-        //1天
-        calendar.add(Calendar.HOUR,24);
-        Date date = calendar.getTime();
-
-        jedis.hset("session1","session1_token",token);
-        jedis.hset("session1","session1_expireTime",sdf.format(date));
-    }
-
-    private boolean isValidToken(String s) throws Exception {
-
-        if (s == null || s.equals("")) {
-            return false;
-        }
-        String session1Token = jedis.hget("session1", "session1_token");
-        if (session1Token == null || session1Token.equals("")) {
-            return false;
-        }
-
-        String expireTimeString = jedis.hget("session1", "session1_expireTime");
-        Date expireTime = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(expireTimeString);
-        Date now = new Date();
-
-        if (now.after(expireTime)) {
-            return false;
-        }
-
-        //如果token不为空，而且获取到的session1不为空，而且session1没过期
-        // 此时可以认为session1在有效期内
-        return true;
+        isSessionValid = demo.isSessionValid(token);
+        System.out.println("第二次访问系统的session校验结果：" + isSessionValid);
     }
 }
