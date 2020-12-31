@@ -3,40 +3,42 @@ package com.cheng.redisdemo.list;
 import redis.clients.jedis.Jedis;
 
 /**
- * @Date:2020/11/12 17:47
+ * @Date:2020/12/31 9:42
  * @Author: Cheng
  * @Description:秒杀demo
  */
 public class SecKillDemo {
 
-    private static Jedis jedis;
+    private Jedis jedis = new Jedis("127.0.0.1");
 
-    public SecKillDemo(){
-        jedis = new Jedis("127.0.0.1");
+    /**
+     * 入队秒杀请求
+     */
+    public void enqueueSecKillRequest(String secKillRequest) {
+        jedis.lpush("sec_kill_request_queue", secKillRequest);
     }
 
-    public static void main(String[] args) {
+    /**
+     * 从秒杀请求出队,先进先出队列
+     *
+     * @return
+     */
+    public String dequeueSecKillRequest() {
+        return jedis.rpop("sec_kill_request_queue");
+    }
+
+    public static void main(String[] args) throws Exception {
         SecKillDemo demo = new SecKillDemo();
 
-        for (int i = 0; i < 100; i++) {
-            demo.enqueueSecKillRequest("第"+(i+1)+"个秒杀");
+        for (int i = 0; i < 20; i++) {
+            demo.enqueueSecKillRequest("第" + i + "个秒杀请求");
         }
 
-        while (true){
-            String secKillRequest = demo.dequeueSecKillRequest();
-
-            if(null==secKillRequest||"".equals(secKillRequest)||"null".equals(secKillRequest)){
-                break;
-            }
+        String secKillRequest = "";
+        while (secKillRequest!=null){
+            secKillRequest = demo.dequeueSecKillRequest();
             System.out.println(secKillRequest);
         }
     }
 
-    private String dequeueSecKillRequest() {
-        return jedis.rpop("sec_kill_request");
-    }
-
-    private void enqueueSecKillRequest(String s) {
-        jedis.lpush("sec_kill_request",s);
-    }
 }
