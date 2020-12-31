@@ -8,6 +8,7 @@ import java.util.Set;
  * @Date:2020/12/31 15:58
  * @Author: Cheng
  * @Description:微博关注案例
+ * 微博关注，这里需要明白关注动作是两步，一个是关注谁，一个是被谁关注
  */
 public class MicroBlog {
 
